@@ -1,0 +1,86 @@
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 56px);
+  grid-template-rows: repeat(8, 56px);
+  gap: 0;
+  user-select: none;
+}
+
+.square {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  position: relative;
+  cursor: pointer;
+}
+
+.square.light {
+  background: #f0d9b5;
+}
+.square.dark {
+  background: #b58863;
+}
+
+.square.highlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 4px rgba(50, 205, 50, 0.8);
+}
+
+.square.selected {
+  outline: 4px solid rgba(30, 144, 255, 0.95);
+  outline-offset: -2px;
+}
+
+.square.in-check {
+  outline: 4px solid rgba(220, 20, 60, 0.95);
+  outline-offset: -2px;
+}
+
+.piece {
+  position: absolute;
+  inset: 8px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font:
+    700 18px/1 system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Arial;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.piece.c-w {
+  background: rgba(255, 255, 255, 0.88);
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.piece.c-b {
+  background: rgba(0, 0, 0, 0.72);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.piece.t-p::before {
+  content: "P";
+}
+.piece.t-n::before {
+  content: "N";
+}
+.piece.t-b::before {
+  content: "B";
+}
+.piece.t-r::before {
+  content: "R";
+}
+.piece.t-q::before {
+  content: "Q";
+}
+.piece.t-k::before {
+  content: "K";
+}
