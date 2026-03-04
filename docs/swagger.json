@@ -1,0 +1,53 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Шахматы человек vs компьютер (учебный проект)",
+        "title": "Chess",
+        "contact": {
+            "name": "@hotkosc"
+        },
+        "license": {
+            "name": "MIT"
+        },
+        "version": "0.1"
+    },
+    "basePath": "/",
+    "paths": {
+        "/api/v1/games/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "games"
+                ],
+                "summary": "Получить игру",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Game ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server.game"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "internal_server.game": {
+            "type": "object"
+        }
+    }
+}

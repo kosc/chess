@@ -9,6 +9,14 @@ import (
 	"github.com/kosc/chessweb/internal/server"
 )
 
+// @title           Chess
+// @version         0.1
+// @description     Шахматы человек vs компьютер (учебный проект)
+// @BasePath        /
+// @schemes         http
+//
+// @contact.name    @hotkosc
+// @license.name    MIT
 func main() {
 	addr := getenv("ADDR", ":8080")
 

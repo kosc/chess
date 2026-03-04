@@ -213,6 +213,13 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, toGameStateResponse(g))
 }
 
+// handleGetGame godoc
+// @Summary      Получить игру
+// @Tags         games
+// @Produce      json
+// @Param        id   path      string  true  "Game ID"
+// @Success      200  {object}  game
+// @Router       /api/v1/games/{id} [get]
 func handleGetGame(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {

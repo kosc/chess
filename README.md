@@ -62,3 +62,10 @@ Open the URL printed by Vite (usually `http://localhost:5173`).
 
 Frontend uses an API base URL (defaults to `http://localhost:8080`).  
 
+
+## Documentaion
+
+### Re-generate docs
+```bash
+swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
+```

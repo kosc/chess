@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	_ "github.com/kosc/chessweb/docs"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 func NewHTTPHandler() http.Handler {
@@ -22,6 +25,9 @@ func NewHTTPHandler() http.Handler {
 
 	mux.HandleFunc("POST /api/v1/games/{id}/legal-moves", handleLegalMovesRoute)
 	mux.HandleFunc("POST /api/v1/games/{id}/move", handleMakeMoveRoute)
+
+	// Swagger
+	mux.Handle("GET /swagger/", httpSwagger.WrapHandler)
 
 	// CORS для dev (React Vite)
 	return withCORS(mux)

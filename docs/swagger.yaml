@@ -1,0 +1,34 @@
+basePath: /
+definitions:
+  internal_server.game:
+    type: object
+info:
+  contact:
+    name: '@hotkosc'
+  description: Шахматы человек vs компьютер (учебный проект)
+  license:
+    name: MIT
+  title: Chess
+  version: "0.1"
+paths:
+  /api/v1/games/{id}:
+    get:
+      parameters:
+      - description: Game ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_server.game'
+      summary: Получить игру
+      tags:
+      - games
+schemes:
+- http
+swagger: "2.0"
