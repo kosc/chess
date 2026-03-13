@@ -40,7 +40,6 @@ type gameStateResponse struct {
 	DrawReason   string `json:"drawReason,omitempty"`
 	ClockEnabled bool   `json:"clockEnabled"`
 
-	// add:
 	HumanSide string `json:"humanSide"`
 	YourTurn  bool   `json:"yourTurn"`
 
@@ -236,6 +235,14 @@ func handleGetGame(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toGameStateResponse(g))
 }
 
+// handleGetGame godoc
+// @Summary      Получить допустимые ходы с заданной клетки
+// @Tags         games
+// @Produce      json
+// @Param        id     path      string  true  "Game ID"
+// @Param        from   path      string  true  "Cell addr"
+// @Success      200  {object}  game
+// @Router       /api/v1/games/{id} [get]
 func handleLegalMoves(w http.ResponseWriter, r *http.Request, id string) {
 	g := storeGet(id)
 	if g == nil {
