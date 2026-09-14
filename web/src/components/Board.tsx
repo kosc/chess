@@ -48,7 +48,7 @@ export function Board({
             const idx = uiRank * 8 + file;
             const sq = idxToSquare(idx);
             const isCheck = checkSquare === sq;
-            const isLight = (file + uiRank) % 2 === 0;
+            const isLight = (file + uiRank) % 2 === 1;
 
             const p = board[idx];
             const isSelected = selected === sq;
