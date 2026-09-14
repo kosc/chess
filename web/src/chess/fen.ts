@@ -34,7 +34,7 @@ export function parseFENBoard(fen: string): Board64 {
       if (!"pnbrqk".includes(lower)) throw new Error("Invalid FEN: piece char");
 
       const idx = rank * 8 + file;
-      board[idx] = { color: color as any, type: lower as any };
+      board[idx] = { color, type: lower as PieceType };
       file += 1;
     }
     if (file !== 8) throw new Error("Invalid FEN: file count");

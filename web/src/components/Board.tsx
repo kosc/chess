@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import type { Board64, Piece } from "../chess/fen";
 import { idxToSquare } from "../chess/fen";
 

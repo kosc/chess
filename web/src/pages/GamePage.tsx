@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { GameState } from "../api/types";
 import { createGame, legalMoves, makeMove } from "../api/client";
 import { parseFENBoard } from "../chess/fen";
@@ -18,8 +18,8 @@ export function GamePage() {
         setLoading(true);
         const g = await createGame({ clockEnabled: false, humanSide: "white" });
         setGame(g);
-      } catch (e: any) {
-        setErr(e?.message ?? String(e));
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
@@ -64,8 +64,8 @@ export function GamePage() {
         setGame(next);
         setSelected(null);
         setHighlights(new Set());
-      } catch (e: any) {
-        setErr(e?.message ?? String(e));
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
