@@ -136,6 +136,9 @@ func TestBotTimeoutDoesNotApplyBotMove(t *testing.T) {
 	if after.Status != "timeout" || after.Winner != "white" || after.LastMove != "e2e4" || after.SideToMove != "black" || after.BlackSec != 0 {
 		t.Fatalf("wrong bot timeout: %+v", after)
 	}
+	if len(after.MoveHistory) != 1 || after.MoveHistory[0].UCI != "e2e4" {
+		t.Fatalf("history includes a timed-out bot move: %+v", after.MoveHistory)
+	}
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if len(g.historyKeys) != 2 {

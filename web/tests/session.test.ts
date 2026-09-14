@@ -12,6 +12,7 @@ const game: GameState = {
   yourTurn: true,
   clockEnabled: false,
   lastMove: "e7e5",
+  moveHistory: [{ number: 1, side: "white", uci: "e2e4" }, { number: 1, side: "black", uci: "e7e5" }],
 };
 
 function storageWith(id?: string) {

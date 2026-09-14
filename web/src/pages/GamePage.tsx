@@ -4,6 +4,7 @@ import { getGame, legalMoves, makeMove, MoveError } from "../api/client";
 import { loadOrCreateGame, startNewGame } from "../api/session";
 import { parseFENBoard } from "../chess/fen";
 import { Board } from "../components/Board";
+import { MoveHistory } from "../components/MoveHistory";
 import { idxToSquare } from "../chess/fen";
 
 export function GamePage() {
@@ -214,6 +215,7 @@ export function GamePage() {
       )}
 
       {board ? (
+        <div className="game-layout">
         <Board
           board={board}
           selected={selected}
@@ -222,6 +224,8 @@ export function GamePage() {
           checkSquare={checkedKingSquare}
           disabled={loading || needsSync || !game?.yourTurn}
         />
+        <MoveHistory key={game?.id} moves={game?.moveHistory ?? []} />
+        </div>
       ) : (
         <p>Board not ready</p>
       )}

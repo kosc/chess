@@ -22,9 +22,16 @@ export interface GameState {
   yourTurn: boolean;
 
   lastMove?: string;
+  moveHistory: PlayedMove[];
 
   whiteSec?: number;
   blackSec?: number;
+}
+
+export interface PlayedMove {
+  number: number;
+  side: Side;
+  uci: string;
 }
 
 export interface LegalMovesResponse {

@@ -44,10 +44,17 @@ type gameStateResponse struct {
 	HumanSide string `json:"humanSide"`
 	YourTurn  bool   `json:"yourTurn"`
 
-	LastMove string `json:"lastMove,omitempty"`
+	LastMove    string       `json:"lastMove,omitempty"`
+	MoveHistory []playedMove `json:"moveHistory"`
 
 	WhiteSec int `json:"whiteSec"`
 	BlackSec int `json:"blackSec"`
+}
+
+type playedMove struct {
+	Number int    `json:"number"`
+	Side   string `json:"side"`
+	UCI    string `json:"uci"`
 }
 
 type makeMoveRequest struct {
@@ -95,6 +102,17 @@ type game struct {
 	botMoveTimeMs int
 
 	historyKeys []string // repetition keys
+	moves       []playedMove
+}
+
+// recordMove is called only after a move has been successfully applied.
+func (g *game) recordMove(pos chess.Position, move chess.Move) {
+	g.lastMoveUCI = move.UCI()
+	g.moves = append(g.moves, playedMove{
+		Number: pos.FullmoveNumber,
+		Side:   pos.SideToMove.String(),
+		UCI:    move.UCI(),
+	})
 }
 
 func chessKey(pos chess.Position) string {
@@ -207,7 +225,7 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 			if chosen != nil {
 				next, err := chess.ApplyMove(curPos, *chosen)
 				if err == nil {
-					g.lastMoveUCI = chosen.UCI()
+					g.recordMove(curPos, *chosen)
 					g.fen = next.FEN()
 					g.sideToMove = next.SideToMove.String()
 					g.historyKeys = append(g.historyKeys, chessKey(next))
@@ -383,7 +401,7 @@ func handleMakeMove(w http.ResponseWriter, r *http.Request, id string) {
 	}
 
 	// Update game state after human move
-	g.lastMoveUCI = chosen.UCI()
+	g.recordMove(pos, *chosen)
 	g.fen = next.FEN()
 	g.sideToMove = next.SideToMove.String()
 	g.historyKeys = append(g.historyKeys, chessKey(next))
@@ -432,7 +450,7 @@ func handleMakeMove(w http.ResponseWriter, r *http.Request, id string) {
 			if chosen2 != nil {
 				next2, err := chess.ApplyMove(next, *chosen2)
 				if err == nil {
-					g.lastMoveUCI = chosen2.UCI()
+					g.recordMove(next, *chosen2)
 					g.fen = next2.FEN()
 					g.sideToMove = next2.SideToMove.String()
 					g.historyKeys = append(g.historyKeys, chessKey(next2))
@@ -538,7 +556,8 @@ func toGameStateResponse(g *game) gameStateResponse {
 		HumanSide: g.humanSide,
 		YourTurn:  g.sideToMove == g.humanSide && (g.status == "in_progress" || g.status == "check"),
 
-		LastMove: g.lastMoveUCI,
+		LastMove:    g.lastMoveUCI,
+		MoveHistory: append([]playedMove{}, g.moves...),
 
 		WhiteSec: remainingSeconds(g.whiteRemaining),
 		BlackSec: remainingSeconds(g.blackRemaining),

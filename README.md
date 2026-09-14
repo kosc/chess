@@ -18,6 +18,8 @@ The server is the source of truth: it validates moves, applies rules, and return
 - UI support endpoints
   - Request legal moves for a selected square (current side to move only)
   - Server returns updated FEN after each move (bot replies within the same `/move` request)
+  - Move history includes both sides, numbered from the initial FEN, and is restored with the game.
+    The UI displays coordinate notation (for example, `e2–e4`, `a7–a8=Q`).
 - Optional clocks through the API (`clockEnabled: true`, `initialSeconds`)
   - Elapsed time retains sub-second precision; response seconds are rounded up, including explicit zero on expiry.
   - Moves, game reads and legal-move requests update the clock. Timed games are polled by the frontend once per second.

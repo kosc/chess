@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -61,7 +62,7 @@ func TestMoveRejectsBotTurn(t *testing.T) {
 	}
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	if after := toGameStateResponse(g); after != before || !g.turnStartedAt.Equal(started) || len(g.historyKeys) != 1 {
+	if after := toGameStateResponse(g); !reflect.DeepEqual(after, before) || !g.turnStartedAt.Equal(started) || len(g.historyKeys) != 1 {
 		t.Fatal("rejected move changed game state or clock")
 	}
 }
@@ -97,6 +98,9 @@ func TestConcurrentMovesAndReads(t *testing.T) {
 				pos, err := chess.ParseFEN(snapshot.FEN)
 				if err != nil || pos.SideToMove.String() != snapshot.SideToMove || !snapshot.YourTurn {
 					t.Errorf("inconsistent or intermediate snapshot: %+v", snapshot)
+				}
+				if len(snapshot.MoveHistory) != 0 && len(snapshot.MoveHistory) != 2 {
+					t.Errorf("incomplete move history: %+v", snapshot.MoveHistory)
 				}
 				w = httptest.NewRecorder()
 				h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, base+"/legal-moves?from=g1", nil))
@@ -241,7 +245,7 @@ func TestIllegalMoveLeavesPositionUnchanged(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &after); err != nil {
 		t.Fatal(err)
 	}
-	if after != state {
+	if !reflect.DeepEqual(after, state) {
 		t.Fatalf("illegal move changed state: %+v", after)
 	}
 }
@@ -265,6 +269,9 @@ func TestHumanMoveEndsGameWithoutBotReply(t *testing.T) {
 			}
 			if state.Status != tc.status || state.LastMove != tc.move || state.YourTurn || state.SideToMove != "black" {
 				t.Fatalf("incorrect terminal state: %+v", state)
+			}
+			if len(state.MoveHistory) != 1 || state.MoveHistory[0].UCI != tc.move {
+				t.Fatalf("terminal move missing from history: %+v", state.MoveHistory)
 			}
 			g := storeGet(state.ID)
 			g.mu.RLock()
