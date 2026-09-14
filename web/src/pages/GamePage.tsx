@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GameState } from "../api/types";
 import { createGame, legalMoves, makeMove } from "../api/client";
 import { parseFENBoard } from "../chess/fen";
@@ -10,6 +10,7 @@ export function GamePage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const requestPending = useRef(false);
   const [err, setErr] = useState<string>("");
 
   useEffect(() => {
@@ -52,12 +53,13 @@ export function GamePage() {
   }, [game, board]);
 
   async function onSquareClick(sq: string) {
-    if (!game) return;
+    if (!game || loading || requestPending.current || !game.yourTurn) return;
     setErr("");
 
     // move if destination
     if (selected && highlights.has(sq)) {
       const uci = `${selected}${sq}`;
+      requestPending.current = true;
       try {
         setLoading(true);
         const next = await makeMove(game.id, uci);
@@ -67,18 +69,14 @@ export function GamePage() {
       } catch (e: unknown) {
         setErr(e instanceof Error ? e.message : String(e));
       } finally {
+        requestPending.current = false;
         setLoading(false);
       }
       return;
     }
 
     // otherwise select
-    if (!game.yourTurn) {
-      setSelected(null);
-      setHighlights(new Set());
-      return;
-    }
-
+    requestPending.current = true;
     try {
       setLoading(true);
       const res = await legalMoves(game.id, sq);
@@ -92,6 +90,7 @@ export function GamePage() {
       setSelected(null);
       setHighlights(new Set());
     } finally {
+      requestPending.current = false;
       setLoading(false);
     }
   }
@@ -128,6 +127,7 @@ export function GamePage() {
           highlights={highlights}
           onSquareClick={onSquareClick}
           checkSquare={checkedKingSquare}
+          disabled={loading || !game?.yourTurn}
         />
       ) : (
         <p>Board not ready</p>

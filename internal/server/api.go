@@ -69,6 +69,9 @@ type gameStore struct {
 var store = &gameStore{games: map[string]*game{}}
 
 type game struct {
+	// Protects state for the entire human move and bot reply.
+	mu sync.RWMutex
+
 	id string
 
 	// TODO: сюда добавим реальную позицию (internal/chess.Position)
@@ -205,11 +208,12 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 	// TODO: если req.FEN пусто — поставить стартовый FEN
 	// TODO: распарсить FEN в internal/chess.Position, валидировать, выставить sideToMove
 
+	response := toGameStateResponse(g)
 	store.mu.Lock()
 	store.games[g.id] = g
 	store.mu.Unlock()
 
-	writeJSON(w, http.StatusCreated, toGameStateResponse(g))
+	writeJSON(w, http.StatusCreated, response)
 }
 
 // handleGetGame godoc
@@ -232,7 +236,10 @@ func handleGetGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toGameStateResponse(g))
+	g.mu.RLock()
+	response := toGameStateResponse(g)
+	g.mu.RUnlock()
+	writeJSON(w, http.StatusOK, response)
 }
 
 // handleGetGame godoc
@@ -262,7 +269,10 @@ func handleLegalMoves(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	pos, err := chess.ParseFEN(g.fen)
+	g.mu.RLock()
+	fen := g.fen
+	g.mu.RUnlock()
+	pos, err := chess.ParseFEN(fen)
 	if err != nil {
 		// это уже ошибка состояния сервера (FEN должен быть валиден)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "corrupt game state: " + err.Error()})
@@ -299,11 +309,6 @@ func handleMakeMove(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	if g.status != "in_progress" && g.status != "check" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "game is finished"})
-		return
-	}
-
 	var req makeMoveRequest
 	if err := readJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -312,6 +317,18 @@ func handleMakeMove(w http.ResponseWriter, r *http.Request, id string) {
 	req.Move = strings.TrimSpace(req.Move)
 	if req.Move == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "move is required"})
+		return
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.status != "in_progress" && g.status != "check" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "game is finished"})
+		return
+	}
+	if g.sideToMove != g.humanSide {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "not your turn"})
 		return
 	}
 
@@ -498,6 +515,7 @@ func handleMakeMoveRoute(w http.ResponseWriter, r *http.Request) {
 	handleMakeMove(w, r, id)
 }
 
+// Caller must hold g.mu when the game is published in store.
 func toGameStateResponse(g *game) gameStateResponse {
 	return gameStateResponse{
 		ID:           g.id,
@@ -508,7 +526,7 @@ func toGameStateResponse(g *game) gameStateResponse {
 		ClockEnabled: g.clockEnabled,
 
 		HumanSide: g.humanSide,
-		YourTurn:  g.sideToMove == g.humanSide,
+		YourTurn:  g.sideToMove == g.humanSide && (g.status == "in_progress" || g.status == "check"),
 
 		LastMove: g.lastMoveUCI,
 

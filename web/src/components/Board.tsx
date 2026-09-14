@@ -8,6 +8,7 @@ type Props = {
     highlights: Set<string>;
     onSquareClick: (sq: string) => void;
     checkSquare?: string | null;
+    disabled?: boolean;
 };
 
 function pieceClass(p: Piece): string {
@@ -20,6 +21,7 @@ export function Board({
     highlights,
     onSquareClick,
     checkSquare,
+    disabled = false,
 }: Props) {
     const squares: JSX.Element[] = [];
 
@@ -45,6 +47,7 @@ export function Board({
                         isCheck ? "in-check" : "",
                     ].join(" ")}
                     onClick={() => onSquareClick(sq)}
+                    disabled={disabled}
                     type="button"
                 >
                     {p ? <span className={pieceClass(p)} /> : null}
