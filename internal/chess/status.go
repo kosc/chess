@@ -10,22 +10,7 @@ func EvaluateStatus(pos Position, history []string) GameStatus {
 	// history: list of position keys for repetition (we'll use FEN without move clocks)
 	// For v1: pass from server store.
 
-	// 1) Draw by 50-move rule
-	if pos.HalfmoveClock >= 100 {
-		return GameStatus{Status: "draw", DrawReason: "fifty_move"}
-	}
-
-	// 2) Draw by insufficient material
-	if isInsufficientMaterial(pos) {
-		return GameStatus{Status: "draw", DrawReason: "insufficient_material"}
-	}
-
-	// 3) Draw by threefold repetition
-	if isThreefoldRepetition(history, repetitionKey(pos)) {
-		return GameStatus{Status: "draw", DrawReason: "threefold"}
-	}
-
-	// Check / mate / stalemate
+	// Mate and stalemate end the game before draw counters are considered.
 	stm := pos.SideToMove
 	kingSq := findKing(pos, stm)
 	inCheck := kingSq != NoSquare && isSquareAttacked(pos, kingSq, stm.Opp())
@@ -48,6 +33,16 @@ func EvaluateStatus(pos Position, history []string) GameStatus {
 			return GameStatus{Status: "checkmate"}
 		}
 		return GameStatus{Status: "stalemate"}
+	}
+
+	if pos.HalfmoveClock >= 100 {
+		return GameStatus{Status: "draw", DrawReason: "fifty_move"}
+	}
+	if isInsufficientMaterial(pos) {
+		return GameStatus{Status: "draw", DrawReason: "insufficient_material"}
+	}
+	if isThreefoldRepetition(history, repetitionKey(pos)) {
+		return GameStatus{Status: "draw", DrawReason: "threefold"}
 	}
 
 	if inCheck {

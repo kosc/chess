@@ -249,6 +249,7 @@ func TestIllegalMoveLeavesPositionUnchanged(t *testing.T) {
 func TestHumanMoveEndsGameWithoutBotReply(t *testing.T) {
 	for _, tc := range []struct{ name, fen, move, status string }{
 		{"mate", "7k/8/5KQ1/8/8/8/8/8 w - - 0 1", "g6g7", "checkmate"},
+		{"mate_at_fifty_move_boundary", "7k/8/5KQ1/8/8/8/8/8 w - - 99 60", "g6g7", "checkmate"},
 		{"stalemate", "7k/8/5K2/6Q1/8/8/8/8 w - - 0 1", "g5g6", "stalemate"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
