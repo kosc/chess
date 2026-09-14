@@ -18,9 +18,19 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     const msg = (data && (data.error as string)) || `HTTP ${res.status}`;
-    throw new Error(msg);
+    throw new HTTPError(res.status, msg);
   }
   return await res.json() as T;
+}
+
+export class HTTPError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "HTTPError";
+    this.status = status;
+  }
 }
 
 export class MoveError extends Error {

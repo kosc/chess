@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GameState } from "../api/types";
-import { createGame, getGame, legalMoves, makeMove, MoveError } from "../api/client";
+import { getGame, legalMoves, makeMove, MoveError } from "../api/client";
+import { loadOrCreateGame, startNewGame } from "../api/session";
 import { parseFENBoard } from "../chess/fen";
 import { Board } from "../components/Board";
 import { idxToSquare } from "../chess/fen";
@@ -11,22 +12,26 @@ export function GamePage() {
   const [highlights, setHighlights] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [needsSync, setNeedsSync] = useState(false);
+  const [startupAttempt, setStartupAttempt] = useState(0);
   const requestPending = useRef(false);
   const [err, setErr] = useState<string>("");
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
-        const g = await createGame({ clockEnabled: false, humanSide: "white" });
-        setGame(g);
+        setErr("");
+        const g = await loadOrCreateGame();
+        if (!cancelled) setGame(g);
       } catch (e: unknown) {
-        setErr(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [startupAttempt]);
 
   const gameID = game?.id;
   const clockRunning = game?.clockEnabled && (game.status === "in_progress" || game.status === "check");
@@ -146,11 +151,36 @@ export function GamePage() {
     }
   }
 
+  async function newGame() {
+    if (requestPending.current) return;
+    requestPending.current = true;
+    setLoading(true);
+    try {
+      const next = await startNewGame();
+      setGame(next);
+      setSelected(null);
+      setHighlights(new Set());
+      setNeedsSync(false);
+      setErr("");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      requestPending.current = false;
+      setLoading(false);
+    }
+  }
+
   return (
     <div style={{ padding: 16 }}>
       <h1>Chess</h1>
 
       {err ? <p style={{ color: "crimson" }}>{err}</p> : null}
+      {!game && !loading ? (
+        <button type="button" onClick={() => setStartupAttempt((attempt) => attempt + 1)}>
+          Retry loading game
+        </button>
+      ) : null}
+      {game ? <button type="button" disabled={loading} onClick={newGame}>New game</button> : null}
       {needsSync ? (
         <div role="alert">
           <p>Connection lost. Refresh the game before making another move.</p>

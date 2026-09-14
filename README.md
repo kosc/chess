@@ -97,6 +97,19 @@ npm run dev
 
 Open the URL printed by Vite (usually `http://localhost:5173`).
 
+The browser saves the current game ID in local storage and restores it after reload,
+including completed games. Use **New game** to start again. If the API no longer has
+the saved game (for example, after a container restart), a new game is created.
+Network errors leave the saved ID intact and offer a retry.
+
+Frontend checks (from `web/`, using Node.js 24):
+
+```bash
+npm test
+npm run build
+npm run lint
+```
+
 ### API base URL
 
 Frontend requests use relative `/api/v1/...` URLs. Nginx proxies them in Docker;
