@@ -5,6 +5,7 @@ export type GameStatus =
   | "check"
   | "checkmate"
   | "stalemate"
+  | "timeout"
   | "draw";
 
 export interface GameState {
@@ -13,6 +14,7 @@ export interface GameState {
   sideToMove: Side;
   status: GameStatus;
   drawReason?: string;
+  winner?: Side;
 
   clockEnabled: boolean;
 

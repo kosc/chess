@@ -18,6 +18,13 @@ The server is the source of truth: it validates moves, applies rules, and return
 - UI support endpoints
   - Request legal moves for a selected square (current side to move only)
   - Server returns updated FEN after each move (bot replies within the same `/move` request)
+- Optional clocks through the API (`clockEnabled: true`, `initialSeconds`)
+  - Elapsed time retains sub-second precision; response seconds are rounded up, including explicit zero on expiry.
+  - Moves, game reads and legal-move requests update the clock. Timed games are polled by the frontend once per second.
+  - Timeout returns `status: "timeout"` and `winner: "white" | "black"`.
+  - Insufficient opposing mating material returns `status: "draw"`, `drawReason: "timeout_insufficient_material"`.
+    Material detection includes minor pieces and bishop square colors, but does not solve position-dependent dead positions
+    (the same limitation is documented for [material-based detection in python-chess](https://python-chess.readthedocs.io/en/latest/core.html#chess.Board.has_insufficient_material)).
 
 ## Repository structure
 

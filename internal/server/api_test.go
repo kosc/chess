@@ -48,7 +48,7 @@ func TestMoveRejectsBotTurn(t *testing.T) {
 	g.fen = strings.Replace(state.FEN, " w ", " b ", 1)
 	g.sideToMove = "black"
 	g.clockEnabled = true
-	g.whiteSec, g.blackSec = 600, 600
+	g.whiteRemaining, g.blackRemaining = 600*time.Second, 600*time.Second
 	g.turnStartedAt = time.Now().Add(-10 * time.Second)
 	before := toGameStateResponse(g)
 	started := g.turnStartedAt

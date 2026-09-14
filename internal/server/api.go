@@ -38,6 +38,7 @@ type gameStateResponse struct {
 	SideToMove   string `json:"sideToMove"`
 	Status       string `json:"status"`
 	DrawReason   string `json:"drawReason,omitempty"`
+	Winner       string `json:"winner,omitempty"`
 	ClockEnabled bool   `json:"clockEnabled"`
 
 	HumanSide string `json:"humanSide"`
@@ -45,8 +46,8 @@ type gameStateResponse struct {
 
 	LastMove string `json:"lastMove,omitempty"`
 
-	WhiteSec int `json:"whiteSec,omitempty"`
-	BlackSec int `json:"blackSec,omitempty"`
+	WhiteSec int `json:"whiteSec"`
+	BlackSec int `json:"blackSec"`
 }
 
 type makeMoveRequest struct {
@@ -80,12 +81,13 @@ type game struct {
 	humanSide   string
 	status      string
 	drawReason  string
+	winner      string
 	sideToMove  string
 	lastMoveUCI string
 
-	clockEnabled bool
-	whiteSec     int
-	blackSec     int
+	clockEnabled   bool
+	whiteRemaining time.Duration
+	blackRemaining time.Duration
 	// чей ход начался (для “шахматных часов”)
 	turnStartedAt time.Time
 
@@ -103,40 +105,48 @@ func chessKey(pos chess.Position) string {
 	return fields[0] + " " + fields[1] + " " + fields[2] + " " + fields[3]
 }
 
-func (g *game) spendTurnTime() {
-	if !g.clockEnabled {
-		return
+// updateClock charges only the active side and freezes clocks when the game ends.
+// Call with g.mu held after publishing the game.
+func (g *game) updateClock(now time.Time) bool {
+	if !g.clockEnabled || (g.status != "in_progress" && g.status != "check") {
+		return false
 	}
-	now := time.Now()
-	elapsed := int(now.Sub(g.turnStartedAt).Seconds())
+	elapsed := now.Sub(g.turnStartedAt)
 	if elapsed < 0 {
-		elapsed = 0
+		return false
 	}
-	if g.sideToMove == "white" {
-		g.whiteSec -= elapsed
-		if g.whiteSec < 0 {
-			g.whiteSec = 0
-		}
-	} else {
-		g.blackSec -= elapsed
-		if g.blackSec < 0 {
-			g.blackSec = 0
-		}
+	remaining := &g.whiteRemaining
+	winner := chess.Black
+	if g.sideToMove == "black" {
+		remaining = &g.blackRemaining
+		winner = chess.White
 	}
+	*remaining = max(0, *remaining-elapsed)
 	g.turnStartedAt = now
+	if *remaining > 0 {
+		return false
+	}
+	g.status = "timeout"
+	g.winner = winner.String()
+	// Only award a draw when the opponent's material cannot deliver mate.
+	if pos, err := chess.ParseFEN(g.fen); err == nil && chess.HasInsufficientMatingMaterial(pos, winner) {
+		g.status = "draw"
+		g.drawReason = "timeout_insufficient_material"
+		g.winner = ""
+	}
+	return true
 }
 
-func (g *game) flagFallen() (bool, string) {
-	if !g.clockEnabled {
-		return false, ""
+func remainingSeconds(remaining time.Duration) int {
+	if remaining <= 0 {
+		return 0
 	}
-	if g.whiteSec <= 0 {
-		return true, "white"
+	// Round up only for display; retain sub-second precision in game state.
+	seconds := remaining / time.Second
+	if remaining%time.Second != 0 {
+		seconds++
 	}
-	if g.blackSec <= 0 {
-		return true, "black"
-	}
-	return false, ""
+	return int(seconds)
 }
 
 func handleCreateGame(w http.ResponseWriter, r *http.Request) {
@@ -157,19 +167,19 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 	initialStatus := chess.EvaluateStatus(pos, hist)
 
 	g := &game{
-		id:            newID(),
-		fen:           normFEN,
-		humanSide:     req.HumanSide,
-		status:        initialStatus.Status,
-		drawReason:    initialStatus.DrawReason,
-		sideToMove:    pos.SideToMove.String(),
-		clockEnabled:  req.ClockEnabled,
-		whiteSec:      req.InitialSeconds,
-		blackSec:      req.InitialSeconds,
-		turnStartedAt: time.Now(),
-		botMaxPly:     req.BotMaxPly,
-		botMoveTimeMs: req.BotMoveTimeMs,
-		historyKeys:   hist,
+		id:             newID(),
+		fen:            normFEN,
+		humanSide:      req.HumanSide,
+		status:         initialStatus.Status,
+		drawReason:     initialStatus.DrawReason,
+		sideToMove:     pos.SideToMove.String(),
+		clockEnabled:   req.ClockEnabled,
+		whiteRemaining: time.Duration(req.InitialSeconds) * time.Second,
+		blackRemaining: time.Duration(req.InitialSeconds) * time.Second,
+		turnStartedAt:  time.Now(),
+		botMaxPly:      req.BotMaxPly,
+		botMoveTimeMs:  req.BotMoveTimeMs,
+		historyKeys:    hist,
 	}
 
 	// If it's bot to move at start (e.g. human plays black), make an opening move immediately.
@@ -181,6 +191,9 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 		}
 
 		botMoveUCI, ok := pickFirstLegalMove(curPos)
+		if g.updateClock(time.Now()) {
+			ok = false
+		}
 		if ok {
 			bm, _ := chess.ParseUCI(botMoveUCI)
 			legal := chess.LegalMovesFrom(curPos, bm.From)
@@ -235,9 +248,10 @@ func handleGetGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g.mu.RLock()
+	g.mu.Lock()
+	g.updateClock(time.Now())
 	response := toGameStateResponse(g)
-	g.mu.RUnlock()
+	g.mu.Unlock()
 	writeJSON(w, http.StatusOK, response)
 }
 
@@ -268,9 +282,15 @@ func handleLegalMoves(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	g.mu.RLock()
+	g.mu.Lock()
+	g.updateClock(time.Now())
 	fen := g.fen
-	g.mu.RUnlock()
+	finished := g.status != "in_progress" && g.status != "check"
+	g.mu.Unlock()
+	if finished {
+		writeJSON(w, http.StatusOK, legalMovesResponse{Moves: []string{}, ToSquares: []string{}})
+		return
+	}
 	pos, err := chess.ParseFEN(fen)
 	if err != nil {
 		// это уже ошибка состояния сервера (FEN должен быть валиден)
@@ -332,12 +352,7 @@ func handleMakeMove(w http.ResponseWriter, r *http.Request, id string) {
 	}
 
 	// Spend time for the player who is about to move (current sideToMove in g)
-	g.spendTurnTime()
-	if fallen, side := g.flagFallen(); fallen {
-		// time loss
-		g.status = "draw" // for simplicity? In chess it's loss on time unless insufficient mating material.
-		// We'll implement proper result later; for now mark finished.
-		g.drawReason = "time_" + side
+	if g.updateClock(time.Now()) {
 		writeJSON(w, http.StatusOK, toGameStateResponse(g))
 		return
 	}
@@ -390,19 +405,14 @@ func handleMakeMove(w http.ResponseWriter, r *http.Request, id string) {
 			Think:  time.Duration(g.botMoveTimeMs) * time.Millisecond,
 		}
 		bm, ok := eng.BestMove(next)
+		if g.updateClock(time.Now()) {
+			writeJSON(w, http.StatusOK, toGameStateResponse(g))
+			return
+		}
 		if !ok {
 			// no legal moves
 		} else {
 			botMoveUCI := bm.UCI()
-			// дальше как у тебя: fromSq из botMoveUCI[0:2], legal2, matchLegalMove, ApplyMove...
-			// Spend clock time for bot side (its turn is running)
-			g.spendTurnTime()
-			if fallen, side := g.flagFallen(); fallen {
-				g.status = "draw"
-				g.drawReason = "time_" + side
-				writeJSON(w, http.StatusOK, toGameStateResponse(g))
-				return
-			}
 
 			// Determine "from" square from botMoveUCI
 			if len(botMoveUCI) < 4 {
@@ -522,6 +532,7 @@ func toGameStateResponse(g *game) gameStateResponse {
 		SideToMove:   g.sideToMove,
 		Status:       g.status,
 		DrawReason:   g.drawReason,
+		Winner:       g.winner,
 		ClockEnabled: g.clockEnabled,
 
 		HumanSide: g.humanSide,
@@ -529,8 +540,8 @@ func toGameStateResponse(g *game) gameStateResponse {
 
 		LastMove: g.lastMoveUCI,
 
-		WhiteSec: g.whiteSec,
-		BlackSec: g.blackSec,
+		WhiteSec: remainingSeconds(g.whiteRemaining),
+		BlackSec: remainingSeconds(g.blackRemaining),
 	}
 }
 
@@ -548,6 +559,8 @@ func normalizeCreateReq(req *createGameRequest) {
 	if req.InitialSeconds <= 0 {
 		req.InitialSeconds = 10 * 60
 	}
+	const maxClockSeconds = int64((1<<63 - 1) / time.Second)
+	req.InitialSeconds = int(min(int64(req.InitialSeconds), maxClockSeconds))
 	if req.BotMaxPly < 2 {
 		req.BotMaxPly = 3
 	}

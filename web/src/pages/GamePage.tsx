@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GameState } from "../api/types";
-import { createGame, legalMoves, makeMove } from "../api/client";
+import { createGame, getGame, legalMoves, makeMove } from "../api/client";
 import { parseFENBoard } from "../chess/fen";
 import { Board } from "../components/Board";
 import { idxToSquare } from "../chess/fen";
@@ -26,6 +26,30 @@ export function GamePage() {
       }
     })();
   }, []);
+
+  const gameID = game?.id;
+  const clockRunning = game?.clockEnabled && (game.status === "in_progress" || game.status === "check");
+
+  useEffect(() => {
+    if (!gameID || !clockRunning) return;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      if (requestPending.current) return;
+      requestPending.current = true;
+      try {
+        const next = await getGame(gameID);
+        if (!cancelled) setGame(next);
+      } catch (e: unknown) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        requestPending.current = false;
+      }
+    }, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [gameID, clockRunning]);
 
   const board = useMemo(() => {
     if (!game) return null;
@@ -107,6 +131,10 @@ export function GamePage() {
             Status: <b>{game.status}</b>{" "}
             {game.drawReason ? <>({game.drawReason})</> : null}
           </p>
+          {game.winner ? <p>Winner: <b>{game.winner}</b></p> : null}
+          {game.clockEnabled ? (
+            <p>Time: White <b>{game.whiteSec}s</b>, Black <b>{game.blackSec}s</b></p>
+          ) : null}
           <p>
             You: <b>{game.humanSide}</b>, Side to move: <b>{game.sideToMove}</b>{" "}
             (yourTurn: <b>{String(game.yourTurn)}</b>)
