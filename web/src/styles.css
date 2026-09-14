@@ -1,14 +1,48 @@
-.board {
+.board-frame {
+  --square-size: 56px;
+  display: inline-grid;
+  grid-template-areas: "ranks board" ". files";
+  grid-template-columns: 24px auto;
+  grid-template-rows: auto 24px;
+}
+
+.board-ranks,
+.board-files {
   display: grid;
-  grid-template-columns: repeat(8, 56px);
-  grid-template-rows: repeat(8, 56px);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.board-ranks {
+  grid-area: ranks;
+  grid-template-rows: repeat(8, var(--square-size));
+}
+
+.board-files {
+  grid-area: files;
+  grid-template-columns: repeat(8, var(--square-size));
+}
+
+.board-ranks span,
+.board-files span {
+  display: grid;
+  place-items: center;
+}
+
+.board {
+  grid-area: board;
+  display: grid;
+  grid-template-columns: repeat(8, var(--square-size));
+  grid-template-rows: repeat(8, var(--square-size));
   gap: 0;
   user-select: none;
 }
 
 .square {
-  width: 56px;
-  height: 56px;
+  width: var(--square-size);
+  height: var(--square-size);
   padding: 0;
   margin: 0;
   border: 0;

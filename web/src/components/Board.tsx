@@ -75,5 +75,15 @@ export function Board({
         }
     }
 
-    return <div className="board">{squares}</div>;
+    return (
+        <div className="board-frame">
+            <div className="board-ranks" aria-hidden="true">
+                {[8, 7, 6, 5, 4, 3, 2, 1].map((rank) => <span key={rank}>{rank}</span>)}
+            </div>
+            <div className="board">{squares}</div>
+            <div className="board-files" aria-hidden="true">
+                {Array.from("abcdefgh", (file) => <span key={file}>{file}</span>)}
+            </div>
+        </div>
+    );
 }
