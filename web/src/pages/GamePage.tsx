@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GameState } from "../api/types";
-import { createGame, getGame, legalMoves, makeMove } from "../api/client";
+import { createGame, getGame, legalMoves, makeMove, MoveError } from "../api/client";
 import { parseFENBoard } from "../chess/fen";
 import { Board } from "../components/Board";
 import { idxToSquare } from "../chess/fen";
@@ -10,6 +10,7 @@ export function GamePage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [needsSync, setNeedsSync] = useState(false);
   const requestPending = useRef(false);
   const [err, setErr] = useState<string>("");
 
@@ -31,7 +32,7 @@ export function GamePage() {
   const clockRunning = game?.clockEnabled && (game.status === "in_progress" || game.status === "check");
 
   useEffect(() => {
-    if (!gameID || !clockRunning) return;
+    if (!gameID || !clockRunning || needsSync) return;
     let cancelled = false;
     const timer = window.setInterval(async () => {
       if (requestPending.current) return;
@@ -49,7 +50,7 @@ export function GamePage() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [gameID, clockRunning]);
+  }, [gameID, clockRunning, needsSync]);
 
   const board = useMemo(() => {
     if (!game) return null;
@@ -77,7 +78,7 @@ export function GamePage() {
   }, [game, board]);
 
   async function onSquareClick(sq: string) {
-    if (!game || loading || requestPending.current || !game.yourTurn) return;
+    if (!game || loading || needsSync || requestPending.current || !game.yourTurn) return;
     setErr("");
 
     // move if destination
@@ -91,6 +92,13 @@ export function GamePage() {
         setSelected(null);
         setHighlights(new Set());
       } catch (e: unknown) {
+        if (e instanceof MoveError && e.state) {
+          setGame(e.state);
+        } else {
+          setNeedsSync(true);
+        }
+        setSelected(null);
+        setHighlights(new Set());
         setErr(e instanceof Error ? e.message : String(e));
       } finally {
         requestPending.current = false;
@@ -119,11 +127,38 @@ export function GamePage() {
     }
   }
 
+  async function restoreGame() {
+    if (!game || requestPending.current) return;
+    requestPending.current = true;
+    setLoading(true);
+    try {
+      const next = await getGame(game.id);
+      setGame(next);
+      setSelected(null);
+      setHighlights(new Set());
+      setNeedsSync(false);
+      setErr("");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      requestPending.current = false;
+      setLoading(false);
+    }
+  }
+
   return (
     <div style={{ padding: 16 }}>
       <h1>Chess</h1>
 
       {err ? <p style={{ color: "crimson" }}>{err}</p> : null}
+      {needsSync ? (
+        <div role="alert">
+          <p>Connection lost. Refresh the game before making another move.</p>
+          <button type="button" disabled={loading} onClick={restoreGame}>
+            Refresh game
+          </button>
+        </div>
+      ) : null}
 
       {game ? (
         <>
@@ -155,7 +190,7 @@ export function GamePage() {
           highlights={highlights}
           onSquareClick={onSquareClick}
           checkSquare={checkedKingSquare}
-          disabled={loading || !game?.yourTurn}
+          disabled={loading || needsSync || !game?.yourTurn}
         />
       ) : (
         <p>Board not ready</p>

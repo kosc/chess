@@ -7,6 +7,7 @@ import type {
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
+    signal: AbortSignal.timeout(15_000),
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -14,12 +15,22 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
-  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
     const msg = (data && (data.error as string)) || `HTTP ${res.status}`;
     throw new Error(msg);
   }
-  return data as T;
+  return await res.json() as T;
+}
+
+export class MoveError extends Error {
+  readonly state: GameState | null;
+
+  constructor(cause: unknown, state: GameState | null) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "MoveError";
+    this.state = state;
+  }
 }
 
 export async function createGame(params: {
@@ -49,8 +60,20 @@ export async function legalMoves(
 
 export async function makeMove(id: string, move: string): Promise<GameState> {
   const req: MakeMoveRequest = { move };
-  return http<GameState>(`/api/v1/games/${id}/move`, {
-    method: "POST",
-    body: JSON.stringify(req),
-  });
+  try {
+    return await http<GameState>(`/api/v1/games/${id}/move`, {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  } catch (error: unknown) {
+    // The server may have applied the move before its response was lost.
+    // Read the current position; never automatically resend the move.
+    let state: GameState | null = null;
+    try {
+      state = await getGame(id);
+    } catch {
+      // The caller must keep the board locked until a subsequent read succeeds.
+    }
+    throw new MoveError(error, state);
+  }
 }
