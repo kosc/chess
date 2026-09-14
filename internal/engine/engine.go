@@ -90,11 +90,7 @@ func negamax(ctx context.Context, pos chess.Position, depth int, alpha int, beta
 		return 0, false
 	}
 
-	// Terminal or depth 0
-	if depth == 0 {
-		return eval(pos), true
-	}
-
+	// Check terminal positions even on the last search ply.
 	moves := allLegalMoves(pos)
 	if len(moves) == 0 {
 		// Mate or stalemate
@@ -108,6 +104,10 @@ func negamax(ctx context.Context, pos chess.Position, depth int, alpha int, beta
 		default:
 			return 0, true
 		}
+	}
+
+	if depth == 0 {
+		return eval(pos), true
 	}
 
 	for i := range moves {
