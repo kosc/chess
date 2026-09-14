@@ -129,7 +129,6 @@ func applyCastle(pos Position, m Move) (Position, error) {
 		pos.Board[mustSq("g1")] = Piece{Type: King, Color: White}
 		pos.Board[mustSq("f1")] = Piece{Type: Rook, Color: White}
 		pos.Castling &^= (CastleWK | CastleWQ)
-		pos.HalfmoveClock++
 		pos.EnPassant = NoSquare
 		pos.SideToMove = Black
 		return pos, nil
@@ -150,7 +149,6 @@ func applyCastle(pos Position, m Move) (Position, error) {
 		pos.Board[mustSq("c1")] = Piece{Type: King, Color: White}
 		pos.Board[mustSq("d1")] = Piece{Type: Rook, Color: White}
 		pos.Castling &^= (CastleWK | CastleWQ)
-		pos.HalfmoveClock++
 		pos.EnPassant = NoSquare
 		pos.SideToMove = Black
 		return pos, nil
@@ -173,7 +171,6 @@ func applyCastle(pos Position, m Move) (Position, error) {
 		pos.Board[mustSq("g8")] = Piece{Type: King, Color: Black}
 		pos.Board[mustSq("f8")] = Piece{Type: Rook, Color: Black}
 		pos.Castling &^= (CastleBK | CastleBQ)
-		pos.HalfmoveClock++
 		pos.EnPassant = NoSquare
 		pos.SideToMove = White
 		pos.FullmoveNumber++
@@ -195,7 +192,6 @@ func applyCastle(pos Position, m Move) (Position, error) {
 		pos.Board[mustSq("c8")] = Piece{Type: King, Color: Black}
 		pos.Board[mustSq("d8")] = Piece{Type: Rook, Color: Black}
 		pos.Castling &^= (CastleBK | CastleBQ)
-		pos.HalfmoveClock++
 		pos.EnPassant = NoSquare
 		pos.SideToMove = White
 		pos.FullmoveNumber++
