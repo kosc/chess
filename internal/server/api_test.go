@@ -14,8 +14,17 @@ import (
 
 func createTestGame(t *testing.T, h http.Handler) gameStateResponse {
 	t.Helper()
+	return createTestGameWithRequest(t, h, createGameRequest{BotMaxPly: 2, BotMoveTimeMs: 5000})
+}
+
+func createTestGameWithRequest(t *testing.T, h http.Handler, req createGameRequest) gameStateResponse {
+	t.Helper()
+	body, err := json.Marshal(req)
+	if err != nil {
+		t.Fatal(err)
+	}
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/games", strings.NewReader(`{"botMaxPly":2,"botMoveTimeMs":5000}`)))
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/games", strings.NewReader(string(body))))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create: %d %s", w.Code, w.Body.String())
 	}
@@ -142,6 +151,125 @@ func TestFinishedGameDisallowsMoves(t *testing.T) {
 			h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, base+"/move", strings.NewReader(`{"move":"e2e4"}`)))
 			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "game is finished") {
 				t.Fatalf("expected finished game error, got %d %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestCreateGameEvaluatesInitialPosition(t *testing.T) {
+	for _, tc := range []struct {
+		name, fen, status, reason string
+	}{
+		{"mate", "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1", "checkmate", ""},
+		{"stalemate", "7k/5Q2/5K2/8/8/8/8/8 b - - 0 1", "stalemate", ""},
+		{"material", "7k/8/5K2/8/8/8/8/8 b - - 0 1", "draw", "insufficient_material"},
+		{"fifty_move", "7k/8/5K2/8/8/8/8/R7 b - - 100 1", "draw", "fifty_move"},
+	} {
+		for _, side := range []string{"white", "black"} {
+			t.Run(tc.name+"/"+side, func(t *testing.T) {
+				h := NewHTTPHandler()
+				state := createTestGameWithRequest(t, h, createGameRequest{FEN: tc.fen, HumanSide: side})
+				if state.Status != tc.status || state.DrawReason != tc.reason || state.YourTurn || state.LastMove != "" || state.FEN != tc.fen {
+					t.Fatalf("incorrect initial state: %+v", state)
+				}
+				w := httptest.NewRecorder()
+				h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/games/"+state.ID+"/move", strings.NewReader(`{"move":"h8h7"}`)))
+				if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "game is finished") {
+					t.Fatalf("terminal position accepted move: %d %s", w.Code, w.Body.String())
+				}
+			})
+		}
+	}
+	t.Run("check", func(t *testing.T) {
+		state := createTestGameWithRequest(t, NewHTTPHandler(), createGameRequest{
+			FEN: "R6k/8/8/8/8/8/8/K7 b - - 0 1", HumanSide: "black",
+		})
+		if state.Status != "check" || !state.YourTurn || state.LastMove != "" {
+			t.Fatalf("incorrect check state: %+v", state)
+		}
+	})
+}
+
+func TestHumanMoveAndBotReply(t *testing.T) {
+	h := NewHTTPHandler()
+	state := createTestGameWithRequest(t, h, createGameRequest{BotMaxPly: 4, BotMoveTimeMs: 1})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/games/"+state.ID+"/move", strings.NewReader(`{"move":"e2e4"}`)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("move: %d %s", w.Code, w.Body.String())
+	}
+	var next gameStateResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &next); err != nil {
+		t.Fatal(err)
+	}
+	pos, _ := chess.ParseFEN(state.FEN)
+	from, _ := chess.ParseSquare("e2")
+	human := matchLegalMove(chess.LegalMovesFrom(pos, from), "e2e4")
+	if human == nil {
+		t.Fatal("missing human move")
+	}
+	afterHuman, err := chess.ApplyMove(pos, *human)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bot, err := chess.ParseUCI(next.LastMove)
+	if err != nil {
+		t.Fatalf("missing bot reply: %+v", next)
+	}
+	legalBot := matchLegalMove(chess.LegalMovesFrom(afterHuman, bot.From), next.LastMove)
+	if legalBot == nil {
+		t.Fatalf("illegal bot reply: %s", next.LastMove)
+	}
+	expected, err := chess.ApplyMove(afterHuman, *legalBot)
+	if err != nil || next.FEN != expected.FEN() || !next.YourTurn || next.SideToMove != "white" {
+		t.Fatalf("incorrect state after bot reply: %+v", next)
+	}
+}
+
+func TestIllegalMoveLeavesPositionUnchanged(t *testing.T) {
+	h := NewHTTPHandler()
+	state := createTestGame(t, h)
+	base := "/api/v1/games/" + state.ID
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, base+"/move", strings.NewReader(`{"move":"e2e5"}`)))
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "illegal move") {
+		t.Fatalf("expected illegal move error: %d %s", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, base, nil))
+	var after gameStateResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &after); err != nil {
+		t.Fatal(err)
+	}
+	if after != state {
+		t.Fatalf("illegal move changed state: %+v", after)
+	}
+}
+
+func TestHumanMoveEndsGameWithoutBotReply(t *testing.T) {
+	for _, tc := range []struct{ name, fen, move, status string }{
+		{"mate", "7k/8/5KQ1/8/8/8/8/8 w - - 0 1", "g6g7", "checkmate"},
+		{"stalemate", "7k/8/5K2/6Q1/8/8/8/8 w - - 0 1", "g5g6", "stalemate"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := NewHTTPHandler()
+			state := createTestGameWithRequest(t, h, createGameRequest{FEN: tc.fen})
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/games/"+state.ID+"/move", strings.NewReader(`{"move":"`+tc.move+`"}`)))
+			if w.Code != http.StatusOK {
+				t.Fatalf("move: %d %s", w.Code, w.Body.String())
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &state); err != nil {
+				t.Fatal(err)
+			}
+			if state.Status != tc.status || state.LastMove != tc.move || state.YourTurn || state.SideToMove != "black" {
+				t.Fatalf("incorrect terminal state: %+v", state)
+			}
+			g := storeGet(state.ID)
+			g.mu.RLock()
+			defer g.mu.RUnlock()
+			if len(g.historyKeys) != 2 {
+				t.Fatalf("expected only human move, history length=%d", len(g.historyKeys))
 			}
 		})
 	}

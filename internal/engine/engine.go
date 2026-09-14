@@ -31,24 +31,25 @@ func (e Engine) BestMove(pos chess.Position) (chess.Move, bool) {
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(think))
 	defer cancel()
 
-	// Iterative deepening 1..maxPly, but you requested 2-4; we'll start at 2.
-	var best chess.Move
-	bestOk := false
-	bestScore := -9999999
+	// Always retain a legal move, even if the first search depth times out.
+	moves := allLegalMoves(pos)
+	if len(moves) == 0 {
+		return chess.Move{}, false
+	}
+	best := moves[0]
 
 	for depth := 2; depth <= maxPly; depth++ {
-		m, sc, ok := searchRoot(ctx, pos, depth)
+		m, _, ok := searchRoot(ctx, pos, depth)
 		if ok {
-			best, bestScore, bestOk = m, sc, true
+			best = m
 		}
 		// If time is up, stop and keep last fully-evaluated depth move.
 		if ctx.Err() != nil {
 			break
 		}
-		_ = bestScore
 	}
 
-	return best, bestOk
+	return best, true
 }
 
 func searchRoot(ctx context.Context, pos chess.Position, depth int) (chess.Move, int, bool) {

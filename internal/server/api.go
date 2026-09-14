@@ -148,18 +148,20 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 
 	normalizeCreateReq(&req)
 	pos, err := chess.ParseFEN(req.FEN)
-	hist := []string{chessKey(pos)}
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid FEN: " + err.Error()})
 		return
 	}
 	normFEN := pos.FEN()
+	hist := []string{chessKey(pos)}
+	initialStatus := chess.EvaluateStatus(pos, hist)
 
 	g := &game{
 		id:            newID(),
 		fen:           normFEN,
 		humanSide:     req.HumanSide,
-		status:        "in_progress",
+		status:        initialStatus.Status,
+		drawReason:    initialStatus.DrawReason,
 		sideToMove:    pos.SideToMove.String(),
 		clockEnabled:  req.ClockEnabled,
 		whiteSec:      req.InitialSeconds,
@@ -171,7 +173,7 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If it's bot to move at start (e.g. human plays black), make an opening move immediately.
-	if g.sideToMove != g.humanSide {
+	if g.sideToMove != g.humanSide && (g.status == "in_progress" || g.status == "check") {
 		curPos, err := chess.ParseFEN(g.fen)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "corrupt initial state: " + err.Error()})
@@ -205,9 +207,6 @@ func handleCreateGame(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// TODO: если req.FEN пусто — поставить стартовый FEN
-	// TODO: распарсить FEN в internal/chess.Position, валидировать, выставить sideToMove
-
 	response := toGameStateResponse(g)
 	store.mu.Lock()
 	store.games[g.id] = g
