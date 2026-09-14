@@ -12,8 +12,26 @@ type Props = {
 };
 
 function pieceClass(p: Piece): string {
-    return `piece c-${p.color} t-${p.type}`;
+    return `piece c-${p.color}`;
 }
+
+const pieceSymbols = {
+    p: "♟",
+    n: "♞",
+    b: "♝",
+    r: "♜",
+    q: "♛",
+    k: "♚",
+} satisfies Record<Piece["type"], string>;
+
+const pieceNames = {
+    p: "pawn",
+    n: "knight",
+    b: "bishop",
+    r: "rook",
+    q: "queen",
+    k: "king",
+} satisfies Record<Piece["type"], string>;
 
 export function Board({
     board,
@@ -48,9 +66,10 @@ export function Board({
                     ].join(" ")}
                     onClick={() => onSquareClick(sq)}
                     disabled={disabled}
+                    aria-label={p ? `${sq}: ${p.color === "w" ? "white" : "black"} ${pieceNames[p.type]}` : sq}
                     type="button"
                 >
-                    {p ? <span className={pieceClass(p)} /> : null}
+                    {p ? <span className={pieceClass(p)} aria-hidden="true">{pieceSymbols[p.type]}</span> : null}
                 </button>,
             );
         }

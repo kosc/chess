@@ -1,7 +1,7 @@
 # ChessWeb (Go backend, React frontend)
 
 A web chess app: *human vs bot*.  
-Backend is written in *Go* (stdlib `net/http`), frontend is *React 18* (Vite).  
+Backend is written in *Go* (stdlib `net/http`), frontend is *React 19* (Vite).
 The server is the source of truth: it validates moves, applies rules, and returns updated positions as *FEN*.
 
 ## Features (v1)
@@ -27,12 +27,44 @@ The server is the source of truth: it validates moves, applies rules, and return
 - `internal/server` — HTTP API handlers, in-memory game store
 - `web/` — React frontend (Vite)
 
-> If your frontend folder name differs (e.g. `chessweb-frontend/`), adjust the commands below accordingly.
+## Run with Docker Compose
+
+Requires Docker Engine and the Docker Compose plugin. From the repository root:
+
+```bash
+docker compose up --build -d --wait
+```
+
+Open http://localhost:8080. Swagger is at http://localhost:8080/swagger/index.html,
+and the health check is at http://localhost:8080/healthz.
+
+Compose builds two services: `api` (Go) and `web` (Nginx serving the React build).
+Only Nginx publishes a host port; it forwards API requests to the Go service.
+The frontend waits for the API health check using
+[Compose's service_healthy dependency](https://docs.docker.com/compose/how-tos/startup-order/).
+Build tools and source code are excluded from the runtime images.
+
+To use a different host port:
+
+```bash
+PORT=8081 docker compose up --build -d --wait
+```
+
+View status and logs, or stop and remove the containers:
+
+```bash
+docker compose ps
+docker compose logs -f
+docker compose down
+```
+
+Games are stored in API memory and are lost when that container restarts.
+There is no database or persistent volume.
 
 ## Requirements
 
-- Go 1.25.x
-- Node.js 18+ (recommended)
+- Go 1.25 or newer (Docker uses Go 1.27)
+- Node.js 24 (also used in Docker)
 - npm
 
 ## Run backend
@@ -45,14 +77,14 @@ go run ./cmd/server
 
 Health check:
 ```bash
-curl -s http://localhost:8080/heathz
+curl -s http://localhost:8080/healthz
 ```
 
 ## Run frontend
 
 ```bash
 cd web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -60,7 +92,8 @@ Open the URL printed by Vite (usually `http://localhost:5173`).
 
 ### API base URL
 
-Frontend uses an API base URL (defaults to `http://localhost:8080`).  
+Frontend requests use relative `/api/v1/...` URLs. Nginx proxies them in Docker;
+the Vite development server proxies them to `http://localhost:8080` during local development.
 
 
 ## Documentaion

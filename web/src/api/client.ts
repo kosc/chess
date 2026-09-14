@@ -5,10 +5,8 @@ import type {
   Side,
 } from "./types";
 
-const API_BASE = "http://localhost:8080";
-
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",

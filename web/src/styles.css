@@ -42,45 +42,23 @@
 
 .piece {
   position: absolute;
-  inset: 8px;
-  border-radius: 999px;
+  inset: 0;
   display: grid;
   place-items: center;
-  font:
-    700 18px/1 system-ui,
-    -apple-system,
-    Segoe UI,
-    Roboto,
-    Arial;
-  border: 2px solid rgba(0, 0, 0, 0.35);
-  box-sizing: border-box;
+  font-family: "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols 2", "Apple Symbols", serif;
+  font-size: 44px;
+  font-weight: 400;
+  line-height: 1;
+  font-variant-emoji: text;
+  pointer-events: none;
 }
 
 .piece.c-w {
-  background: rgba(255, 255, 255, 0.88);
-  color: rgba(0, 0, 0, 0.85);
+  color: #fffaf0;
+  text-shadow: -1px 0 #302820, 1px 0 #302820, 0 -1px #302820, 0 1px #302820;
 }
 
 .piece.c-b {
-  background: rgba(0, 0, 0, 0.72);
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.piece.t-p::before {
-  content: "P";
-}
-.piece.t-n::before {
-  content: "N";
-}
-.piece.t-b::before {
-  content: "B";
-}
-.piece.t-r::before {
-  content: "R";
-}
-.piece.t-q::before {
-  content: "Q";
-}
-.piece.t-k::before {
-  content: "K";
+  color: #24201c;
+  text-shadow: -1px 0 #f0d9b5, 1px 0 #f0d9b5, 0 -1px #f0d9b5, 0 1px #f0d9b5;
 }
