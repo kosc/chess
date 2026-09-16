@@ -22,11 +22,11 @@ export function MoveHistory({ moves }: { moves: PlayedMove[] }) {
 
   return (
     <section className="move-history" aria-labelledby="move-history-title">
-      <h2 id="move-history-title">Move history</h2>
+      <div className="history-heading"><h2 id="move-history-title">История ходов</h2><span className="history-count">{moves.length}</span></div>
       <div className="move-history-scroll" ref={scrollArea}>
-        {moves.length === 0 ? <p>No moves yet.</p> : (
+        {moves.length === 0 ? <div className="history-empty"><span aria-hidden="true">♙</span><p>Первый ход — за вами</p><small>Здесь появится история партии</small></div> : (
           <table>
-            <thead><tr><th scope="col">Move</th><th scope="col">White</th><th scope="col">Black</th></tr></thead>
+            <thead><tr><th scope="col">№</th><th scope="col">Белые</th><th scope="col">Чёрные</th></tr></thead>
             <tbody>
               {Array.from(rows, ([number, row]) => (
                 <tr key={number}>

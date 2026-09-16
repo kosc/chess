@@ -171,64 +171,80 @@ export function GamePage() {
     }
   }
 
-  return (
-    <div style={{ padding: 16 }}>
-      <h1>Chess</h1>
+  const statusLabels: Record<GameState["status"], string> = {
+    in_progress: "Партия идёт", check: "Шах", checkmate: "Мат",
+    stalemate: "Пат", draw: "Ничья", timeout: "Время вышло",
+  };
+  const drawLabels: Record<string, string> = {
+    fifty_move: "Правило 50 ходов", threefold: "Троекратное повторение",
+    insufficient_material: "Недостаточно материала",
+    timeout_insufficient_material: "Недостаточно материала для победы по времени",
+  };
+  const finished = game && !["in_progress", "check"].includes(game.status);
+  const turnLabel = needsSync ? "Нужно восстановить связь" : loading ? "Обновляем позицию…"
+    : finished ? "Партия завершена" : game?.yourTurn ? "Ваш ход" : "Ход компьютера";
+  const clock = (seconds = 0) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-      {err ? <p style={{ color: "crimson" }}>{err}</p> : null}
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">♞</span>
+          <div><p className="eyebrow">Человек и компьютер</p><h1>Шахматы</h1></div>
+        </div>
+        {game ? <button className="button button-primary" type="button" disabled={loading} onClick={newGame}>
+          <span aria-hidden="true">＋</span> Новая партия
+        </button> : null}
+      </header>
+
+      {err ? <p className="notice notice-error" role="alert">{err}</p> : null}
       {!game && !loading ? (
-        <button type="button" onClick={() => setStartupAttempt((attempt) => attempt + 1)}>
-          Retry loading game
+        <button className="button button-primary" type="button" onClick={() => setStartupAttempt((attempt) => attempt + 1)}>
+          Повторить загрузку
         </button>
       ) : null}
-      {game ? <button type="button" disabled={loading} onClick={newGame}>New game</button> : null}
       {needsSync ? (
-        <div role="alert">
-          <p>Connection lost. Refresh the game before making another move.</p>
-          <button type="button" disabled={loading} onClick={restoreGame}>
-            Refresh game
-          </button>
+        <div className="notice" role="alert">
+          <p>Связь прервалась. Обновите позицию, чтобы продолжить партию.</p>
+          <button className="button button-secondary" type="button" disabled={loading} onClick={restoreGame}>Восстановить связь</button>
         </div>
       ) : null}
 
-      {game ? (
-        <>
-          <p>
-            Status: <b>{game.status}</b>{" "}
-            {game.drawReason ? <>({game.drawReason})</> : null}
-          </p>
-          {game.winner ? <p>Winner: <b>{game.winner}</b></p> : null}
-          {game.clockEnabled ? (
-            <p>Time: White <b>{game.whiteSec}s</b>, Black <b>{game.blackSec}s</b></p>
-          ) : null}
-          <p>
-            You: <b>{game.humanSide}</b>, Side to move: <b>{game.sideToMove}</b>{" "}
-            (yourTurn: <b>{String(game.yourTurn)}</b>)
-          </p>
-          <p>
-            Last move: <b>{game.lastMove ?? "-"}</b>
-          </p>
-          {loading ? <p>Working...</p> : null}
-        </>
-      ) : (
-        <p>{loading ? "Loading..." : "No game"}</p>
-      )}
-
-      {board ? (
+      {board && game ? (
         <div className="game-layout">
-        <Board
-          board={board}
-          selected={selected}
-          highlights={highlights}
-          onSquareClick={onSquareClick}
-          checkSquare={checkedKingSquare}
-          disabled={loading || needsSync || !game?.yourTurn}
-        />
-        <MoveHistory key={game?.id} moves={game?.moveHistory ?? []} />
+          <section className="board-panel" aria-label="Шахматная доска">
+            <div className="player-row">
+              <span className="player-avatar avatar-dark" aria-hidden="true">♟</span>
+              <div><strong>{game.humanSide === "black" ? "Вы" : "Компьютер"}</strong><span className="player-side">Чёрные фигуры</span></div>
+              {game.clockEnabled ? <span className={`clock ${game.sideToMove === "black" && !finished ? "clock-active" : ""}`}>{clock(game.blackSec)}</span> : null}
+            </div>
+            <Board board={board} selected={selected} highlights={highlights}
+              onSquareClick={onSquareClick} checkSquare={checkedKingSquare}
+              disabled={loading || needsSync || !game.yourTurn} />
+            <div className="player-row">
+              <span className="player-avatar avatar-light" aria-hidden="true">♟</span>
+              <div><strong>{game.humanSide === "white" ? "Вы" : "Компьютер"}</strong><span className="player-side">Белые фигуры</span></div>
+              {game.clockEnabled ? <span className={`clock ${game.sideToMove === "white" && !finished ? "clock-active" : ""}`}>{clock(game.whiteSec)}</span> : null}
+            </div>
+          </section>
+          <aside className="game-sidebar">
+            <section className="status-card" aria-labelledby="status-title">
+              <p className="eyebrow" id="status-title">Текущая партия</p>
+              <div className={`status-badge ${game.status === "check" ? "status-check" : ""}`}>
+                <span className="status-dot" aria-hidden="true" />{statusLabels[game.status]}
+              </div>
+              <h2 aria-live="polite">{turnLabel}</h2>
+              <p className="status-description">{game.winner ? `Победили ${game.winner === "white" ? "белые" : "чёрные"}.`
+                : game.drawReason ? (drawLabels[game.drawReason] ?? "Партия завершилась вничью.")
+                : finished ? "Начните новую партию, чтобы сыграть ещё."
+                : "Выберите фигуру — доступные ходы появятся на доске."}</p>
+              <div className="game-detail"><span>Последний ход</span><strong>{game.lastMove ? `${game.lastMove.slice(0, 2)}–${game.lastMove.slice(2, 4)}${game.lastMove.length === 5 ? `=${game.lastMove[4].toUpperCase()}` : ""}` : "—"}</strong></div>
+            </section>
+            <MoveHistory key={game.id} moves={game.moveHistory ?? []} />
+          </aside>
         </div>
-      ) : (
-        <p>Board not ready</p>
-      )}
-    </div>
+      ) : <div className="empty-board" role="status"><span aria-hidden="true">♞</span><p>{loading ? "Готовим доску…" : "Не удалось загрузить доску"}</p></div>}
+      <footer className="app-footer">Спокойный темп. Продуманные ходы.</footer>
+    </main>
   );
 }
